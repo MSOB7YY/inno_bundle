@@ -17,10 +17,10 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
-import 'package:inno_bundle/models/cli_configs/inno_bundle_cli_config.dart';
 import 'package:inno_bundle/models/admin_mode.dart';
 import 'package:inno_bundle/models/build_arch.dart';
 import 'package:inno_bundle/models/build_type.dart';
+import 'package:inno_bundle/models/cli_configs/inno_bundle_cli_config.dart';
 import 'package:inno_bundle/models/file_entry.dart';
 import 'package:inno_bundle/models/language.dart';
 import 'package:inno_bundle/models/sign_tool.dart';
@@ -136,6 +136,10 @@ class Config {
   /// the process-global [Directory.current].
   final Directory baseDir;
 
+  /// Adds a Windows Firewall inbound allow rule for the app executable on install
+  /// (removed on uninstall). Requires an admin install, skipped otherwise.
+  final bool firewallRule;
+
   /// Creates a [Config] instance with default values.
   Config({
     required this.pubspecFile,
@@ -166,6 +170,7 @@ class Config {
     this.app = true,
     this.installer = true,
     this.outputDir = installerBuildDir,
+    this.firewallRule = false,
   });
 
   /// The name of the executable file that is created with flutter build.
@@ -204,16 +209,14 @@ class Config {
     Directory? baseDir,
   }) {
     final dir = (baseDir ?? Directory.current).path;
-    final configName =
-        configFile == pubspecFile ? "pubspec.yaml" : "config file";
+    final configName = configFile == pubspecFile ? "pubspec.yaml" : "config file";
     if (configJson['inno_bundle'] is! Map<String, dynamic>) {
       throw InnoBundleError("inno_bundle section is missing from $configName.");
     }
     final Map<String, dynamic> inno = configJson['inno_bundle'];
 
     if (inno['id'] is! String) {
-      throw InnoBundleError(
-          "inno_bundle.id attribute is missing from $configName. "
+      throw InnoBundleError("inno_bundle.id attribute is missing from $configName. "
           "Run `dart run inno_bundle:guid` to generate a new one, "
           "then put it in your $configName.");
     } else if (!Uuid.isValidUUID(fromString: inno['id'])) {
@@ -234,22 +237,18 @@ class Config {
     }
     final String name = inno['name'] ?? pubspecName;
 
-    if ((cliConfig.appVersion ?? inno['version'] ?? json['version'])
-        is! String) {
+    if ((cliConfig.appVersion ?? inno['version'] ?? json['version']) is! String) {
       throw InnoBundleError("version attribute is missing from $configName.");
     }
-    final String version =
-        cliConfig.appVersion ?? inno['version'] ?? json['version'];
+    final String version = cliConfig.appVersion ?? inno['version'] ?? json['version'];
 
     if ((inno['description'] ?? json['description']) is! String) {
-      throw InnoBundleError(
-          "description attribute is missing from $configName.");
+      throw InnoBundleError("description attribute is missing from $configName.");
     }
     final String description = inno['description'] ?? json['description'];
 
     if ((inno['publisher'] ?? json['maintainer']) is! String) {
-      throw InnoBundleError(
-          "maintainer or inno_bundle.publisher attributes are "
+      throw InnoBundleError("maintainer or inno_bundle.publisher attributes are "
           "missing from $configName.");
     }
     final String publisher = inno['publisher'] ?? json['maintainer'];
@@ -268,10 +267,8 @@ class Config {
             p.fromUri(inno['installer_icon']),
           )
         : defaultInstallerIconPlaceholder;
-    if (installerIcon != defaultInstallerIconPlaceholder &&
-        !File(installerIcon).existsSync()) {
-      throw InnoBundleError(
-          "inno_bundle.installer_icon attribute value is invalid, "
+    if (installerIcon != defaultInstallerIconPlaceholder && !File(installerIcon).existsSync()) {
+      throw InnoBundleError("inno_bundle.installer_icon attribute value is invalid, "
           "`$installerIcon` file does not exist.");
     }
 
@@ -291,9 +288,7 @@ class Config {
             .toList(growable: false) ??
         Language.all;
 
-    if (inno['admin'] != null &&
-        inno['admin'] is! bool &&
-        inno['admin'] != "auto") {
+    if (inno['admin'] != null && inno['admin'] is! bool && inno['admin'] != "auto") {
       throw InnoBundleError("inno_bundle.admin attribute is invalid value "
           "in $configName");
     }
@@ -306,12 +301,9 @@ class Config {
 
     final licenseFilePath = p.join(
       dir,
-      inno['license_file'] != null
-          ? p.fromUri(inno['license_file'])
-          : 'LICENSE',
+      inno['license_file'] != null ? p.fromUri(inno['license_file']) : 'LICENSE',
     );
-    final licenseFile =
-        File(licenseFilePath).existsSync() ? licenseFilePath : '';
+    final licenseFile = File(licenseFilePath).existsSync() ? licenseFilePath : '';
 
     final signToolError = SignTool.validateConfig(
       inno["sign_tool"],
@@ -328,14 +320,11 @@ class Config {
       signToolParams: cliConfig.signToolParams,
     );
 
-    final archError =
-        BuildArch.validateConfig(inno['arch'], configName: configName);
+    final archError = BuildArch.validateConfig(inno['arch'], configName: configName);
     if (archError != null) throw InnoBundleError(archError);
     final arch = BuildArch.fromOption(inno['arch']);
 
-    if (inno['vc_redist'] != null &&
-        inno['vc_redist'] is! bool &&
-        inno['vc_redist'] != "download") {
+    if (inno['vc_redist'] != null && inno['vc_redist'] is! bool && inno['vc_redist'] != "download") {
       throw InnoBundleError("inno_bundle.vc_redist attribute is invalid value "
           "in $configName");
     }
@@ -382,10 +371,8 @@ class Config {
       return list;
     }
 
-    final includedFileExts =
-        _ensureListSplit(inno['file_extensions_associations'] as List?);
-    final excludedFileExts =
-        _ensureListSplit(inno['file_extensions_associations_exclude'] as List?);
+    final includedFileExts = _ensureListSplit(inno['file_extensions_associations'] as List?);
+    final excludedFileExts = _ensureListSplit(inno['file_extensions_associations_exclude'] as List?);
 
     return Config(
       pubspecFile: pubspecFile,
@@ -434,8 +421,7 @@ class Config {
     Directory? baseDir,
   }) {
     final pubspecJson = readYaml(pubspecFile);
-    final configJson =
-        configFile == pubspecFile ? pubspecJson : readYaml(configFile);
+    final configJson = configFile == pubspecFile ? pubspecJson : readYaml(configFile);
 
     return Config.fromJson(
       pubspecJson,
@@ -472,8 +458,6 @@ class Config {
       'APP_BUILD_INSTALLER': installer.toString(),
     };
 
-    return variables.entries
-        .map((entry) => '${entry.key}=${entry.value}')
-        .join('\n');
+    return variables.entries.map((entry) => '${entry.key}=${entry.value}').join('\n');
   }
 }

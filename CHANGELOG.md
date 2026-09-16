@@ -10,6 +10,8 @@
 
 - Add file extension associations ("Open with" in File Explorer) via `file_extensions_associations` and `file_extensions_associations_exclude` (the latter removes associations without requiring an uninstall).
 
+- Add `firewall_rule` option: adds a Windows Firewall inbound allow rule for the app executable on install (removed on uninstall). Requires an admin install, skipped otherwise.
+
 - Fix registry commands for file-extension associations to use the executable file name (`<pubspecName>.exe`), not the project name.
 
 - Specify the Inno Setup version in error messages for clarity.
